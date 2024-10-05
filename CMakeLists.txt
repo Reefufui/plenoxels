@@ -4,7 +4,7 @@ project (simplerf)
 # get rid of annoying MSVC warnings.
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 20)
 option(USE_VULKAN "Enable GPU implementation via Vulkan" OFF)
 
 find_package(OpenMP)

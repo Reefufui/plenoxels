@@ -100,6 +100,9 @@ Plenoxel trilinearInterpolation (const std::vector <Plenoxel>& grid, int gridSiz
 
   xyz0 = clamp (xyz0, 0, gridSize - 1);
   xyz1 = clamp (xyz1, 0, gridSize - 1);
+  // std::cout << "xyz = (" << xyz.x << " " << xyz.y << " " << xyz.z << ")" << std::endl;
+  // std::cout << "xyz0 = (" << xyz0.x << " " << xyz0.y << " " << xyz0.z << ")" << std::endl;
+  // std::cout << "xyz1 = (" << xyz1.x << " " << xyz1.y << " " << xyz1.z << ")" << std::endl;
 
   float3 w_xyz = xyz - float3 (xyz0);
 
@@ -126,22 +129,49 @@ Plenoxel trilinearInterpolation (const std::vector <Plenoxel>& grid, int gridSiz
   return result;
 }
 
-float4 VolumetricRendering (float3 origin, float3 dir, float tmin, float tmax, const std::vector <Plenoxel>& grid, int gridSize, float& alpha) {
-	alpha = 1.0f;
-	float4 color = float4(0.0f);
+Plenoxel nearest (const std::vector <Plenoxel>& grid, int gridSize, float3 point) {
+  float3 xyz = point * (gridSize - 1);
+  int x = clamp ((int) round (xyz.x), 0, gridSize - 1);
+  int y = clamp ((int) round (xyz.y), 0, gridSize - 1);
+  int z = clamp ((int) round (xyz.z), 0, gridSize - 1);
+
+  auto getIndex = [gridSize] (int x, int y, int z) -> size_t {
+    return x + gridSize * (y + gridSize * z);
+  };
+
+  Plenoxel result = grid [getIndex (x, y, z)];
+
+  return result;
+}
+
+float3 VolumetricRendering (float3 origin, float3 dir, float tmin, float tmax, const std::vector <Plenoxel>& grid, int gridSize) {
+	float3 color = float3 (0.0f);
+	float T = 1.0f;
 	float t = tmin;
+
+	float delta = 1.0f / gridSize;
 	
-	while (t < tmax && alpha > 0.01f) {
+	while (t < tmax && T > 0.1f) {
 	  float3 point = origin + t * dir;
     Plenoxel sample = trilinearInterpolation (grid, gridSize, point);
+    // Plenoxel sample = nearest (grid, gridSize, point);
 
-	  float a = 0.005f;
-	  color += a * alpha * float4 (1.0f,1.0f,0.0f,0.0f);
-	  alpha *= (1.0f - a);
-	  t += 1.0f / gridSize;
+    float sigma = sample.density;
+
+    if (sigma < 0.0)
+      sigma = 0.0;
+
+    float r = clamp (eval_sh (sample.sh_r, dir), 0.0f, 1.0f);
+    float g = clamp (eval_sh (sample.sh_g, dir), 0.0f, 1.0f);
+    float b = clamp (eval_sh (sample.sh_b, dir), 0.0f, 1.0f);
+
+    color += T * (1 - exp (-sigma * delta)) * float3 (r, g, b);
+    T *= exp (-sigma * delta);
+
+	  t += delta;
 	}
 	
-	return color;
+	return clamp (color, 0.0f, 1.0f);
 }
 
 static inline uint32_t RealColorToUint32 (float4 real_color) {
@@ -170,8 +200,7 @@ void Plenoxels::kernel2D_Forward (uint32_t* out_color, uint32_t width, uint32_t 
       
       float4 resColor (0.0f);
       if (tNearAndFar.x < tNearAndFar.y && tNearAndFar.x > 0.0f) {
-        float alpha = 1.0f;
-	      resColor = VolumetricRendering (rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, m_grid, m_gridSize, alpha);
+	      resColor = to_float4 (VolumetricRendering (rayPos, rayDir, tNearAndFar.x, tNearAndFar.y, m_grid, m_gridSize), 1.0f);
       }
       
       out_color [y * width + x] = RealColorToUint32 (resColor);

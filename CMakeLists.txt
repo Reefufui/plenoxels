@@ -5,7 +5,7 @@ project (simplerf)
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
 set (CMAKE_CXX_STANDARD 20)
-option(USE_VULKAN "Enable GPU implementation via Vulkan" OFF)
+option(USE_VULKAN "Enable GPU implementation via Vulkan" ON)
 
 find_package(OpenMP)
 
@@ -52,12 +52,9 @@ endif()
 
 if(USE_VULKAN)
   add_executable(testapp main.cpp
-                 example_tracer/example_tracer.cpp
+                 example_tracer/plenoxels.cpp
+                 example_tracer/plenoxels_gpu.cpp
                  external/LiteMath/Image2d.cpp
-
-                 example_tracer/example_tracer_generated.cpp
-                 example_tracer/example_tracer_generated_ds.cpp
-                 example_tracer/example_tracer_generated_init.cpp
 
                  external/vkutils/vk_utils.cpp
                  external/vkutils/vk_copy.cpp
@@ -73,7 +70,7 @@ if(USE_VULKAN)
 
 else()
   add_executable(testapp main.cpp
-                 example_tracer/example_tracer.cpp
+                 example_tracer/plenoxels.cpp
                  external/LiteMath/Image2d.cpp)
 
   set_target_properties(testapp PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

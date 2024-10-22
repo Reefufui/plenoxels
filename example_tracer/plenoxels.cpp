@@ -2,7 +2,7 @@
 #include <chrono>
 #include <string>
 
-#include "example_tracer.h"
+#include "plenoxels.h"
 
 // From Mitsuba 3
 void sh_eval_2 (const float3 &d, float *out) {
@@ -82,7 +82,7 @@ static inline void transform_ray3f (float4x4 a_mWorldViewInv, float3* ray_pos, f
   (*ray_dir) = to_float3 (normalize (rayDirTransformed));
 }
 
-Plenoxel lerp(const Plenoxel& a, const Plenoxel& b, float t) {
+Plenoxel lerp (const Plenoxel& a, const Plenoxel& b, float t) {
   Plenoxel result;
   result.density = LiteMath::lerp (a.density, b.density, t);
   for (int i = 0; i < SH_WIDTH; ++i) {
@@ -188,7 +188,8 @@ static inline uint32_t RealColorToUint32 (float4 real_color) {
   return red | (green << 8) | (blue << 16) | (alpha << 24);
 }
 
-void Plenoxels::kernel2D_Forward (uint32_t* out_color, uint32_t width, uint32_t height) {
+std::vector<uint32_t> Plenoxels::kernel2D_Forward (uint32_t width, uint32_t height) {
+  std::vector<uint32_t> out_color (width * height);
   for (uint32_t y = 0; y < height; y++) {
     for (uint32_t x = 0; x < width; x++) {
       float3 rayDir = EyeRayDir ((float (x) + 0.5f) / float (width), (float (y) + 0.5f) / float (height), m_worldViewProjInv); 
@@ -206,12 +207,14 @@ void Plenoxels::kernel2D_Forward (uint32_t* out_color, uint32_t width, uint32_t 
       out_color [y * width + x] = RealColorToUint32 (resColor);
     }
   }
+  return out_color;
 }
 
-void Plenoxels::Forward (uint32_t* out_color, uint32_t width, uint32_t height) { 
+std::vector<uint32_t> Plenoxels::Forward (uint32_t width, uint32_t height) { 
   auto start = std::chrono::high_resolution_clock::now ();
-  kernel2D_Forward (out_color, width, height);
+  auto result = kernel2D_Forward (width, height);
   forwardTime = float (std::chrono::duration_cast <std::chrono::microseconds> (std::chrono::high_resolution_clock::now () - start).count ()) / 1000.f;
+  return result;
 }  
 
 void Plenoxels::GetExecutionTime(const char* a_funcName, float a_out[4]) {

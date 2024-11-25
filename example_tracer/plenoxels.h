@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <fstream>
@@ -10,13 +11,8 @@
 using namespace LiteMath;
 
 const size_t SH_WIDTH = 9;
-
-struct Plenoxel {
-  float density;
-  float sh_r[SH_WIDTH];
-  float sh_g[SH_WIDTH];
-  float sh_b[SH_WIDTH];
-};
+const size_t PLENOXEL_SIZE = 1 + SH_WIDTH * 3;
+typedef std::array<float, PLENOXEL_SIZE> Plenoxel;
 
 struct BoundingBox {
   float3 min;
@@ -35,27 +31,32 @@ public:
 
   virtual void InitGrid (const float a_gridSize) {
     this->m_gridSize = a_gridSize;
-    this->m_grid.resize (m_gridSize * m_gridSize * m_gridSize);
+    this->m_grid.resize (m_gridSize * m_gridSize * m_gridSize * PLENOXEL_SIZE);
 
     for (size_t i = 0; i < m_gridSize * m_gridSize * m_gridSize; i++) {
-      m_grid[i].density = 0.01;
-      for (size_t j = 0; j < SH_WIDTH; j++) {
-        m_grid[i].sh_r[j] = 0.1;
-        m_grid[i].sh_g[j] = 0.1;
-        m_grid[i].sh_b[j] = 0.1;
+      this->m_grid [i * PLENOXEL_SIZE] = 0.01;
+      for (size_t j = 1; j < PLENOXEL_SIZE; j++) {
+        this->m_grid [i * PLENOXEL_SIZE + j] = 0.1;
+      }
+    }
+  }
+
+  void ZeroGrad () {
+    assert (this->m_gridSize);
+    this->m_grid_d.resize (m_gridSize * m_gridSize * m_gridSize * PLENOXEL_SIZE);
+
+    for (size_t i = 0; i < m_gridSize * m_gridSize * m_gridSize; i++) {
+      this->m_grid_d [i * PLENOXEL_SIZE] = 0.0;
+      for (size_t j = 1; j < PLENOXEL_SIZE; j++) {
+        this->m_grid_d [i * PLENOXEL_SIZE + j] = 0.0;
       }
     }
   }
 
   virtual void LoadGrid (std::string fileName) {
     std::ifstream fin (fileName, std::ios::in | std::ios::binary);
-    fin.read ((char*)&this->m_grid[0], this->m_grid.size () * sizeof (Plenoxel));
+    fin.read ((char*)&this->m_grid[0], this->m_grid.size () * PLENOXEL_SIZE);
     fin.close ();
-  }
-
-  virtual void SetBoundingBox (const float3 boxMin, const float3 boxMax) {
-    m_sceneBoundingBox.min = boxMin;
-    m_sceneBoundingBox.max = boxMax;
   }
 
   virtual void SetWorldViewProjMatrix (const float4x4& a_mat) {
@@ -68,15 +69,17 @@ public:
 
   virtual std::vector<uint32_t> kernel2D_Forward (uint32_t width, uint32_t height);
   std::vector<uint32_t> Forward (uint32_t width, uint32_t height);  
+  std::vector<uint32_t> kernel2D_RayMarch (uint32_t width, uint32_t height);
+  std::vector<uint32_t> RayMarch (uint32_t width, uint32_t height);
 
   void GetExecutionTime (const char* a_funcName, float a_out[4]);
 
 protected:
   float4x4 m_worldViewProjInv;
   float4x4 m_worldViewInv;
-  float    forwardTime;
-  std::vector<Plenoxel> m_grid;
+  float m_forwardTime;
+  std::vector<float> m_grid;
+  std::vector<float> m_grid_d;
   size_t m_gridSize;
-  BoundingBox m_sceneBoundingBox;
 };
 

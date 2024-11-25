@@ -1,0 +1,15 @@
+services:
+  cpp_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: plenoxels-cpp_app
+    container_name: plenoxels_cpp_app
+    volumes:
+      - ./model.dat:/app/model.dat
+      - ./output:/app/output
+      - ./input:/app/input
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command: ["/app/build/testapp"]
